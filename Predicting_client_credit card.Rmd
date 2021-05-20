@@ -1,0 +1,326 @@
+ ---
+title: "Predicting default clients credit cards"
+output: github_document
+---
+
+# Predicting default clients credit cards
+## OVERVIEW OF THE PROBLEM/TASK DESCRIPTION
+1) provide data exploration, statistics, samples and overview of data
+2) to build at least 3 models to classify the clients defaults.
+3) to state the kind of parameters that were used and the variables that were important.
+4) Compare the models, select the best models and give reasons why the one chosen is better than the other models.
+
+
+## Introduction
+This research aimed at the case of customers' default payments in Taiwan and compares the predictive accuracy of probability of default among three data mining methods. From the perspective of risk management, the result of predictive accuracy of the estimated probability of default will be more valuable than the binary result of classification - credible or not credible clients. 
+
+
+## Description of data set
+The study took payment data in October, 2005, from an important bank (a cash and credit card issuer) in Taiwan and the targets were credit card holders of the bank.
+The research employed a binary variable, default payment (Yes = 1, No = 0), as the response variable. This research used the following 23 variables as explanatory variables:
+X1: Amount of the given credit (NT dollar): it includes both the individual consumer credit and his/her family (supplementary) credit.
+X2: Gender (1 = male; 2 = female).
+X3: Education (1 = graduate school; 2 = university; 3 = high school; 4 = others).
+X4: Marital status (1 = married; 2 = single; 3 = others).
+X5: Age (year).
+X6 - X11: History of past payment. We tracked the past monthly payment records (from April to September, 2005) as follows: X6 = the repayment status in September, 2005; X7 = the repayment status in August, 2005; . . .;X11 = the repayment status in April, 2005. The measurement scale for the repayment status is: -1 = pay duly; 1 = payment delay for one month; 2 = payment delay for two months; . . .; 8 = payment delay for eight months; 9 = payment delay for nine months and above.
+X12-X17: Amount of bill statement (NT dollar). X12 = amount of bill statement in September, 2005; X13 = amount of bill statement in August, 2005; . . .; X17 = amount of bill statement in April, 2005.
+X18-X23: Amount of previous payment (NT dollar). X18 = amount paid in September, 2005; X19 = amount paid in August, 2005; . . .;X23 = amount paid in April, 2005. 
+
+### Some important terminologies
+A billing statement is a monthly report that credit card companies issue to credit card holders showing their recent transactions, monthly minimum payment due, and other vital information. Billing statements are issued monthly at the end of each billing cycle.
+
+Credit card delinquency status is a status indicating that your payment is past due by 30 days or more. A delinquency can affect your credit score and impact your ability to get approved for any new credit-based applications. You must make at least the minimum monthly payment by the cutoff time on the due date.
+
+Credit risk is the possibility of a loss resulting from a borrower's failure to repay a loan or meet contractual obligations. A credit risk is risk of default on a debt that may arise from a borrower failing to make required payments.
+
+Credit scoring is a terminology used to describe the formal statistical methods which are
+used for classifying applicants for credit into ‘‘good” and ‘‘bad” risk classes (Hand and Henley (1997)). Credit scoring can also be used to decide extension or denial of credit. It is also performed to determine a creditor's creditworthiness i.e. the ability to pay back.
+
+## TASK 1 - Provide data exploration, statistics, samples and overview of data
+### Loading required packages
+```{r loadpackages}
+library(readxl) #to open the data set in R
+library(Hmisc) # for statistics summary
+library(tidyverse) #package containing other packages for data manipulation, data visualization etc.
+library(e1071) #to build Naive Bayes model
+library(knn) # building knn model
+library(class)
+```
+
+### Loading the dataset
+```{r loaddata}
+credit <- read_xls("C:/Users/test/Documents/Github projects/default client credit card/default of credit card clients.xls", col_names = T)
+head(credit) # view first 6 rows.
+```
+
+```{r dclean}
+str(credit) 
+str(credit[1,])
+my.names <- credit[1,]
+colnames(credit) <- my.names
+credit2 <- credit[-1, -1] # take first row and column as it is not needed
+str(credit2)
+colnames(credit2) # column/variable names changed
+```
+
+### Data Exploration and Manipulation
+The study took payment data in October, 2005, from an important bank (a cash and credit card issuer) in Taiwan and the targets were credit card holders of the bank.
+
+A summary of the data is given below:
+```{r explore}
+credit2[sapply(credit2, is.character)] <- lapply(credit2[sapply(credit2, is.character)], as.integer) # to convert variables to integers
+str(credit2) 
+describe(credit2)
+```
+From the above summary, the following deductions were made;
+The data had no missing values.
+it was observed that the report generated had several values that were out of expectation for some variables e.g.
+In the "PAY_x" variables it was noticed that "PAY_1" was omitted which should have preceded PAY_2 and follow PAY_0. "PAY_x" variables are delinquency variables. According to the data description, "-1" symbolizes a customer is current on the payment of his bills. But, it was observed that the delinquency status variables contained unexpected values such as  "0" and "-2". Likewise, the demographic variables such as "Education" and "Marriage" ought to not to have levels "0", "5", "6" and "0" respectively.
+
+### Data visualization
+The data is explored below as visuals in form of bar chart, density plot etc.
+
+```{r viz1}
+ggplot(credit2, aes(x =as.factor(`default payment next month`))) +
+  geom_bar(width=0.5, fill = "gold") +
+  geom_text(stat='count' , aes(label=stat(count)), vjust=-0.5) +
+  theme_classic()
+
+ND = (23364/30000) * 100
+paste("Percentage of Non-defaulters: ", ND,"%")
+D = 100 - ND
+paste("Percentage of Defaulters: ", D,"%")
+```
+The above bar chart depicted 6636 observations (22.12%) are the cardholders with default payment.
+While, 23364 observations (77.88%) are the cardholders without default payment.
+
+```{r viz2}
+ggplot(credit2, aes(x =as.factor(SEX))) +
+  geom_bar(width=0.5, fill = "brown") +
+  geom_text(stat='count' , aes(label=stat(count)), vjust=-0.5) +
+  theme_classic()
+
+Male = (11888/30000) * 100
+paste("Percentage of Male Credit Card holders: ", Male,"%")
+Female = 100 - Male
+paste("Percentage of Female Credit card holders: ", Female,"%")
+```
+
+We can infer that the above bar chart that the data contains a larger percentage of females credit card holders (60.4%) than males (39.6%).
+
+##### Default payment by SEX
+```{r viz3}
+ggplot(credit2, aes(x = as.factor(SEX), fill = as.factor(`default payment next month`))) +
+ geom_bar(position = position_dodge()) +
+ geom_text(stat="count", 
+           aes(label=stat(count)), 
+           position = position_dodge(width=1), 
+           vjust=-0.5)+
+ theme_classic()
+
+MaleDef = (2873/11888)*100
+paste("Percentage of Male Default Credit Card holders: ", MaleDef,"%")
+FemaleDef = (3763/18112)*100
+paste("Percentage of Female Default Credit card holders: ", FemaleDef,"%")
+```
+The bar chart above depicts we have more of females as credit card holders than males. But by proportion to their sex, we have more male defaulters (2873) (24.17%) to female defaulters (3783)(20.78%). It would have been good to know the male/female defaulters marriage status.
+
+
+
+##### Credit Card holders by level of Education.
+```{r viz4}
+ggplot(credit2, aes(x = as.factor(EDUCATION), fill = as.factor(`default payment next month`))) +
+ geom_bar(position = position_dodge()) +
+ geom_text(stat="count", 
+           aes(label=stat(count)), 
+           position = position_dodge(width=1), 
+           vjust=-0.5)+
+ theme_classic()
+```
+At this point it is obvious that we have more levels than expected which is clear sign of error in data recording. we ought have 4 levels according to the data description given by the data source.
+(X3: Education (1 = graduate school; 2 = university; 3 = high school; 4 = others)). But, we have 7 levels which means we might not consider this variable.
+
+##### Default payment of credit card holders by Marital status
+```{r viz5}
+ggplot(credit2, aes(x = as.factor(MARRIAGE), fill = as.factor(`default payment next month`))) +
+ geom_bar(position = position_dodge()) +
+ geom_text(stat="count", 
+           aes(label=stat(count)), 
+           position = position_dodge(width=1), 
+           vjust=-0.5)+
+ theme_classic()
+```
+We have a similar case in the above plot of having an extra level that we might not be able to place correctly. We have an extra level of zero which was not included in the data description of the variable. (X4: Marital status (1 = married; 2 = single; 3 = others)).
+
+
+##### Age Density
+```{r viz6}
+#density plots on age and limit_balance
+ggplot(credit2, aes(x = AGE)) +
+ geom_density(fill="gold")
+```
+The above plot shows that we had a larger number of credit card holders from the age range of 20 - 40.
+
+
+##### Credit card limit balance density
+```{r viz7}
+ggplot(credit2, aes(x = LIMIT_BAL)) +
+ geom_density(fill="brown")
+```
+We have more credit limit balance between 0 - 125000.
+
+### Data Manipulation
+There are a few things to be achieved in this section. First, we rename all variables to lower case for easier codes typing. 
+Second, rename “pay_0” to “pay_1”. 
+Third, rename the default indicator “default payment next month” with a shorter name “gb_risk”, where “gb” indicates good bad. 
+Fourth, in all the “pay_x” variables, recode the values “-2” and “-1” into “0”. “0” signifies current on payment. Finally, a cross-tab is run to check the recoding is done correctly.
+
+```{r manipulate}
+credit2 <- credit2 %>%
+  # rename the variables to lower case
+  rename_with(str_to_lower, everything()) %>%
+  # rename "pay_0" to "pay_1" and "default payment next month" to "gb_risk"
+  rename("pay_1" = "pay_0", "gb_risk" = "default payment next month")
+
+# set up a function to recode delinquency status
+new_deq <- function(x) {
+  ifelse(x %in% c(-2, -1), 0, x)
+}
+
+# recode delinquency status
+credit3 <- credit2 %>% 
+ mutate(across(pay_1:pay_6, new_deq, .names = "{col}_recode"))
+
+colnames(credit3)
+
+# quick check on the recoding
+table(credit3$pay_1, credit3$pay_1_recode)
+```
+
+#### Variable generation
+Except for some specific variables such as demographic information, raw variables in a data set are normally not used directly in credit scorecards. In this article, new variables are created from delinquency status, limit, and outstanding balance. To keep the scope simple, no new variables will be generated from payment amount. But by using the ideas and codes provided below, the reader should have no problem of creating his/her own variables from payment amount. Variables generation is only limited by imagination or creativity. Given the same data set, different analysts could generate different variables.
+
+```{r deliquency}
+# un-needed "pay_x" variables are removed 
+var_data <- credit3 %>%
+  select(-(pay_1:pay_6))
+str(var_data)
+```
+
+
+### Preparing the data for Machine learning.
+```{r prep}
+data <- var_data %>% 
+  select(-(c(bill_amt1:bill_amt6, pay_amt1:pay_amt6))) # taking out bill amount 
+str(data)
+# partition
+set.seed(1)
+vartrain.index <- sample(c(1:dim(data)[1]), dim(data)[1]*0.6)
+vartrain.df <- data[vartrain.index, ]
+varvalid.df <- data[-vartrain.index, ]
+```
+
+```{r check1}
+ggplot(vartrain.df, aes(x = as.factor(sex), fill = as.factor(gb_risk))) +
+ geom_bar(position = position_dodge()) +
+ geom_text(stat="count", 
+           aes(label=stat(count)), 
+           position = position_dodge(width=1), 
+           vjust=-0.5)+
+ theme_classic()
+
+ggplot(vartrain.df, aes(x =as.factor(gb_risk))) +
+  geom_bar(width=0.5, fill = "brown") +
+  geom_text(stat='count' , aes(label=stat(count)), vjust=-0.5) +
+  theme_classic()
+```
+
+
+```{r check2}
+ggplot(varvalid.df, aes(x = as.factor(sex), fill = as.factor(gb_risk))) +
+ geom_bar(position = position_dodge()) +
+ geom_text(stat="count", 
+           aes(label=stat(count)), 
+           position = position_dodge(width=1), 
+           vjust=-0.5)+
+ theme_classic()
+
+ggplot(varvalid.df, aes(x =as.factor(gb_risk))) +
+  geom_bar(width=0.5, fill = "brown") +
+  geom_text(stat='count' , aes(label=stat(count)), vjust=-0.5) +
+  theme_classic()
+```
+
+
+```{r lreg}
+# Logistic regression
+# Train the model using the training sets and check score
+logistic <- glm(gb_risk ~ ., data = vartrain.df, family='binomial')
+summary(logistic)
+#Predict Output
+predicted = predict(logistic, varvalid.df)
+
+lr_predict = predict(logistic, varvalid.df, type = "response")
+# confusion matrix
+table_mat = table(varvalid.df$gb_risk) #lr_predict > 0.68
+lr_accuracy = sum(diag(table_mat)) / sum(table_mat)
+paste("The accuracy is : ", lr_accuracy)
+```
+
+```{r NBayes}
+## Naive Bayes
+# Fitting model
+fit <-naiveBayes(gb_risk ~ ., data = vartrain.df)
+summary(fit)
+#Predict Output 
+predicted= predict(fit,varvalid.df)
+
+nb_model = naiveBayes(gb_risk ~., data=vartrain.df)
+nb_predict = predict(nb_model,varvalid.df)
+table_mat = table(nb_predict, varvalid.df$gb_risk)
+nb_accuracy = sum(diag(table_mat)) / sum(table_mat)
+paste("The accuracy is : ", nb_accuracy)
+```
+
+```{r knn}
+## knn
+# Fitting model
+library(class)
+train_labels = select(vartrain.df, gb_risk)[,1]
+test_labels = select(varvalid.df, gb_risk)[,1]
+# drop labels for prediction
+vartrain.df$gb_risk=NULL
+varvalid.df$gb_risk=NULL
+knn_predict = knn(train = vartrain.df,
+                  test = varvalid.df,
+                  cl = train_labels,
+                  k=10)
+table_mat = table(knn_predict, test_labels)
+accuracy_knn = sum(diag(table_mat)) / sum(table_mat)
+```
+
+
+## TASK 2 - To build at least 3 models to classify the clients into defaulter or not defaulters
+
+
+
+## TASK 3 - to state the kind of parameters that were used and the variables that were important.
+The following variable were used: The target variables were variables such as sex, limit balance, 
+the response variable was the variable for the default payment next month. This is important to know as it helps ascertain if a credit card holder should be giving an extension. Although, more information will be needed to further ascertain the claim such as the client credit score, previous credit records, income levels etc.
+
+
+## TASK 4 - Compare the models, select the best models and give reasons why the one chosen is better than the other models.
+
+## References
+DATA SOURCE: https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients
+Hand, D. J., & Henley, W. E. (1997). Statistical classification methods in
+consumer credit scoring: A review. Journal of the Royal Statistical
+Society, Series A – Statistics in Society, 160(3), 523–541.
+https://rpubs.com/ngyongkad/scorecard
+https://medium.com/analytics-vidhya/a-beginners-guide-to-learning-r-with-the-titanic-dataset-a630bc5495a8
+DATA MINING FOR BUSINESS ANALYTICS Concepts, Techniques, and Applications in R BY Galit Shmueli, Peter C. Bruce, Inbal Yahav, Nitin R. Patel, Kenneth C. Lichtendahl, Jr.
+https://www.investopedia.com/terms/c/credit-card-balance.asp
+Yeh, I. C., & Lien, C. H. (2009). The comparisons of data mining techniques for the predictive accuracy of probability of default of credit card clients. Expert Systems with Applications, 36(2), 2473-2480.
+
+
