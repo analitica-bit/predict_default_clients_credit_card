@@ -208,11 +208,12 @@ var_data <- credit3 %>%
 str(var_data)
 ```
 
+## TASK 2 - To build at least 3 models to compare the accuracy of the models in classifying client credit card default payment in the next month.
 
 ### Preparing the data for Machine learning.
 ```{r prep}
 data <- var_data %>% 
-  select(-(c(bill_amt1:bill_amt6, pay_amt1:pay_amt6))) # taking out bill amount 
+  select(-(c(limit_bal))) # taking out limit_balance cause it does not determine a person will pay the next month bill.
 str(data)
 # partition
 set.seed(1)
@@ -301,16 +302,12 @@ accuracy_knn = sum(diag(table_mat)) / sum(table_mat)
 ```
 
 
-## TASK 2 - To build at least 3 models to classify the clients into defaulter or not defaulters
-
-
-
 ## TASK 3 - to state the kind of parameters that were used and the variables that were important.
-The following variable were used: The target variables were variables such as sex, limit balance, 
-the response variable was the variable for the default payment next month. This is important to know as it helps ascertain if a credit card holder should be giving an extension. Although, more information will be needed to further ascertain the claim such as the client credit score, previous credit records, income levels etc.
-
+The following variable were used: The target variables were variables such as sex, age, bill amount for a 6 months period, delinquency status and the the amount paid back.
+The response variable was the variable for the default payment next month. This is important to know as it helps ascertain if a credit card holder should be giving an extension. Although, more information will be needed to further ascertain the claim such as the client credit score, previous credit records, income levels etc.
 
 ## TASK 4 - Compare the models, select the best models and give reasons why the one chosen is better than the other models.
+The logistic model accuracy is 1 which is perfect.
 
 ## References
 DATA SOURCE: https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients
